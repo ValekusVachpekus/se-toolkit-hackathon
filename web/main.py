@@ -459,6 +459,36 @@ async def employee_complaint_detail(request: Request, complaint_id: int):
     })
 
 
+@app.post("/employee/complaints/{complaint_id}/accept")
+async def employee_accept_complaint(request: Request, complaint_id: int):
+    if not check_employee_auth(request):
+        return RedirectResponse(url="/login?role=employee", status_code=302)
+    
+    db = get_db()
+    db.execute(
+        "UPDATE complaints SET status = 'accepted' WHERE id = ? AND status = 'pending'",
+        (complaint_id,)
+    )
+    db.commit()
+    db.close()
+    return RedirectResponse(url=f"/employee/complaints/{complaint_id}", status_code=302)
+
+
+@app.post("/employee/complaints/{complaint_id}/reject")
+async def employee_reject_complaint(request: Request, complaint_id: int):
+    if not check_employee_auth(request):
+        return RedirectResponse(url="/login?role=employee", status_code=302)
+    
+    db = get_db()
+    db.execute(
+        "UPDATE complaints SET status = 'rejected' WHERE id = ? AND status = 'pending'",
+        (complaint_id,)
+    )
+    db.commit()
+    db.close()
+    return RedirectResponse(url=f"/employee/complaints/{complaint_id}", status_code=302)
+
+
 @app.get("/employee/ratings", response_class=HTMLResponse)
 async def employee_ratings(request: Request):
     if not check_employee_auth(request):

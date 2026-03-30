@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Рейтинги — ЖКХ Админ-панель{% endblock %}
+{% block title %}Рейтинги — ЖКХ Панель{% endblock %}
 
 {% block content %}
 <div class="flex">
@@ -8,11 +8,8 @@
     <aside class="w-64 bg-gray-800 min-h-screen p-4">
         <div class="text-white text-xl font-bold mb-8">🏠 ЖКХ Панель</div>
         <nav class="space-y-2">
-            <a href="/" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 rounded">📊 Дашборд</a>
-            <a href="/complaints" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 rounded">📋 Жалобы</a>
-            <a href="/employees" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 rounded">👷 Работники</a>
+            <a href="/employee/complaints" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 rounded">📋 Жалобы</a>
             <a href="/employee/ratings" class="block px-4 py-2 text-white bg-gray-700 rounded">⭐ Рейтинги</a>
-            <a href="/blocked" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 rounded">🚫 Заблокированные</a>
             <a href="/logout" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 rounded mt-8">🚪 Выход</a>
         </nav>
     </aside>

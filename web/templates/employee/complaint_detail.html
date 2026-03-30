@@ -24,6 +24,16 @@
                 <div class="flex items-center gap-4">
                     {% if complaint.status == 'pending' %}
                     <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded">Ожидает обработки</span>
+                    <form method="post" action="/employee/complaints/{{ complaint.id }}/accept" class="inline">
+                        <button type="submit" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded">
+                            ✅ Принять
+                        </button>
+                    </form>
+                    <form method="post" action="/employee/complaints/{{ complaint.id }}/reject" class="inline">
+                        <button type="submit" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded">
+                            ❌ Отклонить
+                        </button>
+                    </form>
                     {% elif complaint.status == 'accepted' %}
                     <span class="px-3 py-1 bg-green-100 text-green-800 rounded">Принята</span>
                     {% elif complaint.status == 'rejected' %}
