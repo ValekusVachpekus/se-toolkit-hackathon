@@ -189,7 +189,7 @@ docker compose down
 
 ## 📄 Лицензия
 
-[Лицензия](LICENSE) 
+[GPL v3.0](LICENSE) 
 
 ## 👤 Автор
 
