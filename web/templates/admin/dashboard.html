@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Дашборд — ЖКХ Админ-панель{% endblock %}
 {% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <div class="flex">
     <!-- Sidebar -->
     <aside class="w-64 bg-gray-800 min-h-screen p-4">
@@ -47,6 +48,27 @@
             </div>
         </div>
 
+        <!-- Charts -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <!-- Status Distribution -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Распределение по статусам</h2>
+                <canvas id="statusChart"></canvas>
+            </div>
+
+            <!-- Complaints by Status -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Статистика жалоб</h2>
+                <canvas id="statsChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Complaints by Date -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Жалобы по датам (последние 30 дней)</h2>
+            <canvas id="dateChart"></canvas>
+        </div>
+
         <!-- Recent complaints -->
         <div class="bg-white rounded-lg shadow">
             <div class="px-6 py-4 border-b flex justify-between items-center">
@@ -69,7 +91,7 @@
                         {% for c in recent_complaints %}
                         <tr class="border-t">
                             <td class="py-3">
-                                <a href="/complaints/{{ c.id }}" class="text-blue-500 hover:text-blue-700">#{{ c.id }}</a>
+                                <a href="/admin/complaints/{{ c.id }}" class="text-blue-500 hover:text-blue-700">#{{ c.id }}</a>
                             </td>
                             <td class="py-3">{{ c.fio }}</td>
                             <td class="py-3 text-gray-600">{{ c.address[:40] }}{% if c.address|length > 40 %}...{% endif %}</td>
@@ -96,4 +118,130 @@
         </div>
     </main>
 </div>
+
+<script>
+    // Status Distribution Pie Chart
+    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    const statusChart = new Chart(statusCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Ожидают', 'Принято', 'Отклонено'],
+            datasets: [{
+                data: [{{ stats.pending }}, {{ stats.accepted }}, {{ stats.rejected }}],
+                backgroundColor: [
+                    'rgba(255, 193, 7, 0.7)',
+                    'rgba(76, 175, 80, 0.7)',
+                    'rgba(244, 67, 54, 0.7)'
+                ],
+                borderColor: [
+                    'rgba(255, 193, 7, 1)',
+                    'rgba(76, 175, 80, 1)',
+                    'rgba(244, 67, 54, 1)'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    // Stats Bar Chart
+    const statsCtx = document.getElementById('statsChart').getContext('2d');
+    const statsChart = new Chart(statsCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Всего', 'Ожидают', 'Принято', 'Отклонено', 'Работников', 'Заблокировано'],
+            datasets: [{
+                label: 'Количество',
+                data: [
+                    {{ stats.total }},
+                    {{ stats.pending }},
+                    {{ stats.accepted }},
+                    {{ stats.rejected }},
+                    {{ stats.employees }},
+                    {{ stats.blocked }}
+                ],
+                backgroundColor: [
+                    'rgba(108, 117, 125, 0.7)',
+                    'rgba(255, 193, 7, 0.7)',
+                    'rgba(76, 175, 80, 0.7)',
+                    'rgba(244, 67, 54, 0.7)',
+                    'rgba(156, 39, 176, 0.7)',
+                    'rgba(96, 125, 139, 0.7)'
+                ],
+                borderColor: [
+                    'rgba(108, 117, 125, 1)',
+                    'rgba(255, 193, 7, 1)',
+                    'rgba(76, 175, 80, 1)',
+                    'rgba(244, 67, 54, 1)',
+                    'rgba(156, 39, 176, 1)',
+                    'rgba(96, 125, 139, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            indexAxis: 'x',
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+
+    // Complaints by Date Line Chart
+    const dateCtx = document.getElementById('dateChart').getContext('2d');
+    const dateChart = new Chart(dateCtx, {
+        type: 'line',
+        data: {
+            labels: {{ chart_dates | tojson }},
+            datasets: [{
+                label: 'Жалобы',
+                data: {{ chart_counts | tojson }},
+                borderColor: 'rgba(54, 162, 235, 1)',
+                backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                borderWidth: 2,
+                tension: 0.4,
+                fill: true,
+                pointRadius: 4,
+                pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+</script>
 {% endblock %}

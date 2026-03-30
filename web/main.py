@@ -158,7 +158,20 @@ async def admin_dashboard(request: Request):
         FROM complaints ORDER BY created_at DESC LIMIT 5
     """).fetchall()
     
+    # Complaints by date (last 30 days)
+    complaints_by_date = db.execute("""
+        SELECT DATE(created_at) as date, COUNT(*) as count
+        FROM complaints
+        WHERE created_at >= datetime('now', '-30 days')
+        GROUP BY DATE(created_at)
+        ORDER BY date ASC
+    """).fetchall()
+    
     db.close()
+    
+    # Format data for chart
+    dates = [row[0] for row in complaints_by_date]
+    counts = [row[1] for row in complaints_by_date]
     
     return templates.TemplateResponse("admin/dashboard.html", {
         "request": request,
@@ -171,6 +184,8 @@ async def admin_dashboard(request: Request):
             "employees": employees_count,
         },
         "recent_complaints": recent,
+        "chart_dates": dates,
+        "chart_counts": counts,
     })
 
 @app.get("/admin/complaints", response_class=HTMLResponse)
