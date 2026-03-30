@@ -58,24 +58,52 @@ async def login_page(request: Request, error: str = None, role: str = None):
 @app.post("/login")
 async def login(request: Request):
     form = await request.form()
-    password = form.get("password", "")
     role = form.get("role", "admin").lower()
     
     if role not in ["admin", "employee"]:
         return RedirectResponse(url="/login?error=1&role=admin", status_code=302)
     
-    if password == ADMIN_PASSWORD:
-        logger.info(f"✅ Успешный вход {role}")
-        response = RedirectResponse(
-            url="/admin/complaints" if role == "admin" else "/employee/complaints",
-            status_code=302
-        )
-        response.set_cookie("auth_token", SECRET_KEY, httponly=True, max_age=86400 * 7)
-        response.set_cookie("user_role", role, httponly=True, max_age=86400 * 7)
-        return response
+    if role == "admin":
+        password = form.get("password", "")
+        if password == ADMIN_PASSWORD:
+            logger.info("✅ Успешный вход администратора")
+            response = RedirectResponse(url="/admin/dashboard", status_code=302)
+            response.set_cookie("auth_token", SECRET_KEY, httponly=True, max_age=86400 * 7)
+            response.set_cookie("user_role", "admin", httponly=True, max_age=86400 * 7)
+            return response
+        logger.warning("❌ Неудачная попытка входа администратора (неверный пароль)")
+        return RedirectResponse(url="/login?error=1&role=admin", status_code=302)
     
-    logger.warning("❌ Неудачная попытка входа (неверный пароль)")
-    return RedirectResponse(url=f"/login?error=1&role={role}", status_code=302)
+    else:  # employee
+        code = form.get("code", "").strip()
+        
+        if not code or len(code) != 6 or not code.isdigit():
+            logger.warning(f"❌ Попытка входа сотрудника с неверным кодом: {code}")
+            return RedirectResponse(url="/login?error=invalid_code&role=employee", status_code=302)
+        
+        db = get_db()
+        verification = db.execute(
+            "SELECT user_id, username FROM verification_codes WHERE code=? AND used=0 AND expires_at > datetime('now')",
+            (code,)
+        ).fetchone()
+        
+        if not verification:
+            db.close()
+            logger.warning(f"❌ Неверный или истёкший код: {code}")
+            return RedirectResponse(url="/login?error=invalid_code&role=employee", status_code=302)
+        
+        user_id, username = verification
+        
+        db.execute("UPDATE verification_codes SET used=1 WHERE code=?", (code,))
+        db.execute("UPDATE employees SET web_linked=1 WHERE user_id=?", (user_id,))
+        db.commit()
+        db.close()
+        
+        logger.info(f"✅ Успешный вход сотрудника: {username} ({user_id})")
+        response = RedirectResponse(url="/employee/complaints", status_code=302)
+        response.set_cookie("auth_token", SECRET_KEY, httponly=True, max_age=86400 * 7)
+        response.set_cookie("user_role", "employee", httponly=True, max_age=86400 * 7)
+        return response
 
 
 @app.get("/logout")

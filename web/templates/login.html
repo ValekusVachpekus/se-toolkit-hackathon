@@ -5,34 +5,41 @@
     <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
         <h1 class="text-2xl font-bold text-center mb-6 text-gray-800">🏠 ЖКХ Панель</h1>
         
-        {% if error %}
+        {% if error == 'invalid_code' %}
         <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            Неверный пароль
+            Неверный или истёкший код
+        </div>
+        {% elif error %}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            Ошибка входа
         </div>
         {% endif %}
         
-        <form method="post" action="/login">
-            <div class="mb-4">
-                <label class="block text-gray-700 text-sm font-bold mb-2">
+        <form method="post" action="/login" id="loginForm">
+            <!-- Role selection -->
+            <div class="mb-6">
+                <label class="block text-gray-700 text-sm font-bold mb-3">
                     Вход как:
                 </label>
                 <div class="space-y-3">
-                    <label class="flex items-center">
+                    <label class="flex items-center cursor-pointer">
                         <input 
                             type="radio" 
                             name="role" 
                             value="admin"
                             {% if role == 'admin' %}checked{% endif %}
+                            onchange="toggleForm()"
                             class="mr-2"
                         >
                         <span class="text-gray-700">👨‍💼 Администратор</span>
                     </label>
-                    <label class="flex items-center">
+                    <label class="flex items-center cursor-pointer">
                         <input 
                             type="radio" 
                             name="role" 
                             value="employee"
                             {% if role == 'employee' %}checked{% endif %}
+                            onchange="toggleForm()"
                             class="mr-2"
                         >
                         <span class="text-gray-700">👷 Сотрудник</span>
@@ -40,27 +47,75 @@
                 </div>
             </div>
             
-            <div class="mb-6">
-                <label class="block text-gray-700 text-sm font-bold mb-2" for="password">
-                    Пароль
-                </label>
-                <input 
-                    type="password" 
-                    id="password" 
-                    name="password" 
-                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                    placeholder="Введите пароль"
-                    required
-                    autofocus
+            <!-- Admin login form -->
+            <div id="adminForm" {% if role != 'admin' %}style="display: none;"{% endif %}>
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="password">
+                        Пароль
+                    </label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                        placeholder="Введите пароль"
+                        {% if role == 'admin' %}autofocus{% endif %}
+                    >
+                </div>
+                <button 
+                    type="submit" 
+                    class="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
                 >
+                    Войти
+                </button>
             </div>
-            <button 
-                type="submit" 
-                class="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-            >
-                Войти
-            </button>
+            
+            <!-- Employee login form -->
+            <div id="employeeForm" {% if role != 'employee' %}style="display: none;"{% endif %}>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="code">
+                        Код из Telegram бота
+                    </label>
+                    <p class="text-gray-600 text-sm mb-3">
+                        Отправьте команду <code class="bg-gray-100 px-2 py-1">/link_account</code> боту, чтобы получить код
+                    </p>
+                    <input 
+                        type="text" 
+                        id="code" 
+                        name="code" 
+                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline text-center text-2xl tracking-widest"
+                        placeholder="000000"
+                        maxlength="6"
+                        pattern="[0-9]{6}"
+                        {% if role == 'employee' %}autofocus{% endif %}
+                    >
+                </div>
+                <button 
+                    type="submit" 
+                    class="w-full bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                >
+                    Войти по коду
+                </button>
+            </div>
         </form>
     </div>
 </div>
+
+<script>
+function toggleForm() {
+    const role = document.querySelector('input[name="role"]:checked').value;
+    const adminForm = document.getElementById('adminForm');
+    const employeeForm = document.getElementById('employeeForm');
+    
+    if (role === 'admin') {
+        adminForm.style.display = 'block';
+        employeeForm.style.display = 'none';
+        document.getElementById('password').focus();
+    } else {
+        adminForm.style.display = 'none';
+        employeeForm.style.display = 'block';
+        document.getElementById('code').focus();
+    }
+}
+</script>
 {% endblock %}
