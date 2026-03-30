@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Подать жалобу — ЖКХ Панель{% endblock %}
+{% block content %}
+<nav class="bg-white shadow-sm border-b">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16">
+            <div class="flex items-center">
+                <a href="/user/complaints" class="text-gray-600 hover:text-gray-800 mr-4">
+                    ← Назад
+                </a>
+                <h1 class="text-xl font-semibold text-gray-800">📝 Подать жалобу</h1>
+            </div>
+            <div class="flex items-center">
+                <a href="/logout" class="text-gray-600 hover:text-gray-800">
+                    Выйти
+                </a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <form method="post" action="/user/complaints/new" enctype="multipart/form-data" class="bg-white rounded-lg shadow-sm p-6 space-y-6">
+        {% if error %}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+            {{ error }}
+        </div>
+        {% endif %}
+        
+        <!-- Step 1: FIO -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+                Шаг 1/4: Ваше ФИО <span class="text-red-500">*</span>
+            </label>
+            <input
+                type="text"
+                name="fio"
+                required
+                placeholder="Иванов Иван Иванович"
+                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+        </div>
+        
+        <!-- Step 2: Address -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+                Шаг 2/4: Адрес <span class="text-red-500">*</span>
+            </label>
+            <input
+                type="text"
+                name="address"
+                required
+                placeholder="ул. Пушкина, д. 10, кв. 25"
+                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+        </div>
+        
+        <!-- Step 3: Description -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+                Шаг 3/4: Описание проблемы <span class="text-red-500">*</span>
+            </label>
+            <textarea
+                name="description"
+                required
+                rows="4"
+                placeholder="Опишите суть жалобы: что сломалось, не работает, требует ремонта..."
+                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            ></textarea>
+        </div>
+        
+        <!-- Step 4: Media (optional) -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+                Шаг 4/4: Фото/видео проблемы (по желанию)
+            </label>
+            
+            <div class="space-y-4">
+                <!-- File upload -->
+                <div>
+                    <label class="block text-sm text-gray-600 mb-2">
+                        Загрузить файл:
+                    </label>
+                    <input
+                        type="file"
+                        name="media"
+                        accept="image/*,video/*,.pdf,.doc,.docx"
+                        class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                    <p class="text-xs text-gray-500 mt-1">Фото, видео или документ</p>
+                </div>
+                
+                <div class="flex items-center">
+                    <span class="text-gray-500 mx-3">— ИЛИ —</span>
+                </div>
+                
+                <!-- Link input -->
+                <div>
+                    <label class="block text-sm text-gray-600 mb-2">
+                        Или вставьте ссылку:
+                    </label>
+                    <input
+                        type="url"
+                        name="media_link"
+                        placeholder="https://..."
+                        class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                    <p class="text-xs text-gray-500 mt-1">Ссылка на фото/видео (начинается с http:// или https://)</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Submit -->
+        <div class="pt-4">
+            <button
+                type="submit"
+                class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+                ✅ Отправить жалобу
+            </button>
+        </div>
+        
+        <p class="text-xs text-gray-500 text-center">
+            <span class="text-red-500">*</span> — обязательные поля
+        </p>
+    </form>
+</div>
+{% endblock %}

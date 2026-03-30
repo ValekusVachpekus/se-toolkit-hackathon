@@ -811,9 +811,224 @@ async def user_complaints(request: Request):
     if not check_user_auth(request):
         return RedirectResponse(url="/login?role=user", status_code=302)
 
+    user_id = int(request.cookies.get("user_user_id", "0"))
+    db = get_db()
+    
+    complaints = db.execute("""
+        SELECT id, fio, address, description, status, rating, review, created_at, accepted_by
+        FROM complaints 
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+    """, (user_id,)).fetchall()
+    
+    # Get employee info for accepted complaints
+    complaints_with_emp = []
+    for c in complaints:
+        emp_info = None
+        if c["accepted_by"]:
+            emp_info = db.execute(
+                "SELECT fio, position FROM employees WHERE user_id = ?",
+                (c["accepted_by"],)
+            ).fetchone()
+        complaints_with_emp.append({**dict(c), "employee_info": emp_info})
+    
+    db.close()
+    
     return templates.TemplateResponse("user/complaints.html", {
         "request": request,
+        "complaints": complaints_with_emp,
     })
+
+
+@app.get("/user/complaints/new", response_class=HTMLResponse)
+async def new_complaint_form(request: Request):
+    if not check_user_auth(request):
+        return RedirectResponse(url="/login?role=user", status_code=302)
+    
+    return templates.TemplateResponse("user/complaint_form.html", {
+        "request": request,
+    })
+
+
+@app.post("/user/complaints/new")
+async def submit_complaint(request: Request):
+    if not check_user_auth(request):
+        return RedirectResponse(url="/login?role=user", status_code=302)
+    
+    user_id = int(request.cookies.get("user_user_id", "0"))
+    form = await request.form()
+    
+    fio = form.get("fio", "").strip()
+    address = form.get("address", "").strip()
+    description = form.get("description", "").strip()
+    
+    if not fio or not address or not description:
+        return templates.TemplateResponse("user/complaint_form.html", {
+            "request": request,
+            "error": "Все поля обязательны для заполнения",
+        })
+    
+    # Handle media upload
+    media_file = form.get("media")
+    media_link = form.get("media_link", "").strip()
+    
+    media_file_id = None
+    media_type = None
+    media_local_path = None
+    
+    if media_file and hasattr(media_file, 'filename') and media_file.filename:
+        # Upload file
+        import os
+        import uuid
+        from pathlib import Path
+        
+        ext = Path(media_file.filename).suffix.lower()
+        if not ext:
+            ext = ".bin"
+        
+        filename = f"{user_id}_{uuid.uuid4().hex[:10]}{ext}"
+        local_path = MEDIA_DIR / filename
+        
+        # Determine media type
+        if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+            media_type = "photo"
+        elif ext in ['.mp4', '.avi', '.mov', '.webm']:
+            media_type = "video"
+        else:
+            media_type = "document"
+        
+        # Save file
+        content = await media_file.read()
+        with open(local_path, 'wb') as f:
+            f.write(content)
+        
+        media_local_path = str(local_path)
+        media_file_id = filename  # Store filename for reference
+    
+    elif media_link:
+        # Use link
+        if media_link.startswith("http://") or media_link.startswith("https://"):
+            media_file_id = media_link
+            media_type = "link"
+    
+    # Save complaint
+    db = get_db()
+    username = None  # Will be filled if linked
+    cursor = db.execute(
+        """INSERT INTO complaints (user_id, username, fio, address, description, media_file_id, media_type, media_local_path)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (user_id, username, fio, address, description, media_file_id, media_type, media_local_path)
+    )
+    complaint_id = cursor.lastrowid
+    db.commit()
+    db.close()
+    
+    logger.info(f"📨 Новая жалоба #{complaint_id} от пользователя {user_id} (веб-панель)")
+    
+    return RedirectResponse(url=f"/user/complaints/{complaint_id}", status_code=302)
+
+
+@app.get("/user/complaints/{complaint_id}", response_class=HTMLResponse)
+async def user_complaint_detail(request: Request, complaint_id: int):
+    if not check_user_auth(request):
+        return RedirectResponse(url="/login?role=user", status_code=302)
+    
+    user_id = int(request.cookies.get("user_user_id", "0"))
+    
+    db = get_db()
+    complaint = db.execute(
+        "SELECT * FROM complaints WHERE id = ? AND user_id = ?",
+        (complaint_id, user_id)
+    ).fetchone()
+    
+    if not complaint:
+        db.close()
+        raise HTTPException(status_code=404, detail="Жалоба не найдена")
+    
+    # Get employee info if accepted
+    emp_info = None
+    if complaint["accepted_by"]:
+        emp_info = db.execute(
+            "SELECT fio, position, area FROM employees WHERE user_id = ?",
+            (complaint["accepted_by"],)
+        ).fetchone()
+    
+    db.close()
+    
+    return templates.TemplateResponse("user/complaint_detail.html", {
+        "request": request,
+        "complaint": complaint,
+        "employee_info": emp_info,
+    })
+
+
+@app.get("/user/complaints/{complaint_id}/rate", response_class=HTMLResponse)
+async def rate_complaint_form(request: Request, complaint_id: int):
+    if not check_user_auth(request):
+        return RedirectResponse(url="/login?role=user", status_code=302)
+    
+    user_id = int(request.cookies.get("user_user_id", "0"))
+    
+    db = get_db()
+    complaint = db.execute(
+        "SELECT * FROM complaints WHERE id = ? AND user_id = ? AND status = 'accepted' AND rating IS NULL",
+        (complaint_id, user_id)
+    ).fetchone()
+    
+    if not complaint:
+        db.close()
+        return RedirectResponse(url=f"/user/complaints/{complaint_id}", status_code=302)
+    
+    db.close()
+    
+    return templates.TemplateResponse("user/rate.html", {
+        "request": request,
+        "complaint_id": complaint_id,
+    })
+
+
+@app.post("/user/complaints/{complaint_id}/rate")
+async def submit_rating(request: Request, complaint_id: int):
+    if not check_user_auth(request):
+        return RedirectResponse(url="/login?role=user", status_code=302)
+    
+    user_id = int(request.cookies.get("user_user_id", "0"))
+    form = await request.form()
+    
+    try:
+        rating = int(form.get("rating", "0"))
+        if not 1 <= rating <= 5:
+            raise ValueError()
+    except ValueError:
+        return templates.TemplateResponse("user/rate.html", {
+            "request": request,
+            "complaint_id": complaint_id,
+            "error": "Оценка должна быть от 1 до 5",
+        })
+    
+    review = form.get("review", "").strip()
+    
+    db = get_db()
+    # Verify complaint belongs to user and is accepted without rating
+    complaint = db.execute(
+        "SELECT * FROM complaints WHERE id = ? AND user_id = ? AND status = 'accepted' AND rating IS NULL",
+        (complaint_id, user_id)
+    ).fetchone()
+    
+    if not complaint:
+        db.close()
+        return RedirectResponse(url=f"/user/complaints/{complaint_id}", status_code=302)
+    
+    db.execute(
+        "UPDATE complaints SET rating = ?, review = ?, rated_at = datetime('now') WHERE id = ?",
+        (rating, review if review else None, complaint_id)
+    )
+    db.commit()
+    db.close()
+    
+    logger.info(f"⭐ Жалоба #{complaint_id} оценена на {rating} звезд пользователем {user_id}")
+    
+    return RedirectResponse(url="/user/complaints", status_code=302)
 
 
 # ---------------------------------------------------------------------------

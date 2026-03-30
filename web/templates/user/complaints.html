@@ -7,7 +7,10 @@
             <div class="flex items-center">
                 <h1 class="text-xl font-semibold text-gray-800">👤 Мои жалобы</h1>
             </div>
-            <div class="flex items-center">
+            <div class="flex items-center gap-4">
+                <a href="/user/complaints/new" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium">
+                    + Подать жалобу
+                </a>
                 <a href="/logout" class="text-gray-600 hover:text-gray-800">
                     Выйти
                 </a>
@@ -17,10 +20,62 @@
 </nav>
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div class="bg-white rounded-lg shadow-sm p-6">
-        <p class="text-gray-500 text-center">
-            Страница в разработке...
-        </p>
+    {% if complaints|length == 0 %}
+    <div class="bg-white rounded-lg shadow-sm p-8 text-center">
+        <p class="text-gray-500 text-lg mb-4">У вас пока нет жалоб</p>
+        <a href="/user/complaints/new" class="inline-block bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium">
+            Подать первую жалобу
+        </a>
     </div>
+    {% else %}
+    <div class="grid gap-4">
+        {% for c in complaints %}
+        <a href="/user/complaints/{{ c.id }}" class="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow block">
+            <div class="flex justify-between items-start">
+                <div class="flex-1">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">
+                        Жалоба №{{ c.id }}
+                    </h3>
+                    <p class="text-gray-600 mb-2">
+                        <span class="font-medium">Адрес:</span> {{ c.address }}
+                    </p>
+                    <p class="text-gray-600 mb-3">
+                        {{ c.description[:100] }}{% if c.description|length > 100 %}...{% endif %}
+                    </p>
+                    
+                    {% if c.employee_info %}
+                    <p class="text-sm text-gray-500">
+                        👷 <span class="font-medium">{{ c.employee_info.fio or 'Работник' }}</span>
+                        {% if c.employee_info.position %}({{ c.employee_info.position }}){% endif %}
+                    </p>
+                    {% endif %}
+                </div>
+                
+                <div class="flex flex-col items-end gap-2">
+                    {% if c.status == 'pending' %}
+                    <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">Ожидает</span>
+                    {% elif c.status == 'accepted' %}
+                    <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">Принята</span>
+                    {% elif c.status == 'rejected' %}
+                    <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">Отклонена</span>
+                    {% elif c.status == 'blocked' %}
+                    <span class="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-medium">Заблокировано</span>
+                    {% endif %}
+                    
+                    {% if c.rating %}
+                    <span class="text-yellow-500">{{ "⭐" * c.rating }}</span>
+                    {% elif c.status == 'accepted' %}
+                    <a href="/user/complaints/{{ c.id }}/rate" class="text-sm text-blue-500 hover:text-blue-700 underline">
+                        Оценить
+                    </a>
+                    {% endif %}
+                    
+                    <span class="text-xs text-gray-400">{{ c.created_at[:10] }}</span>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
