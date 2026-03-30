@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Работники — ЖКХ Админ-панель{% endblock %}
+{% block content %}
+<div class="flex">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-gray-800 min-h-screen p-4">
+        <div class="text-white text-xl font-bold mb-8">🏠 ЖКХ Панель</div>
+        <nav class="space-y-2">
+            <a href="/admin/dashboard" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 rounded">📊 Дашборд</a>
+            <a href="/admin/dashboard" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 rounded">📋 Жалобы</a>
+            <a href="/admin/employees" class="block px-4 py-2 text-white bg-gray-700 rounded">👷 Работники</a>
+            <a href="/admin/ratings" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 rounded">⭐ Рейтинги</a>
+            <a href="/admin/blocked" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 rounded">🚫 Заблокированные</a>
+            <a href="/logout" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 rounded mt-8">🚪 Выход</a>
+        </nav>
+    </aside>
+
+    <!-- Main content -->
+    <main class="flex-1 p-8">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Работники</h1>
+        </div>
+        
+        <!-- Add employee form -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-4">Добавить работника</h2>
+            
+            {% if request.query_params.get('error') == 'empty' %}
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                Введите username работника
+            </div>
+            {% elif request.query_params.get('error') == 'exists' %}
+            <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+                Этот работник уже добавлен
+            </div>
+            {% elif request.query_params.get('success') %}
+            <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+                Работник успешно добавлен
+            </div>
+            {% endif %}
+            
+            <form method="post" action="/employees/add" class="flex gap-4">
+                <input 
+                    type="text" 
+                    name="username" 
+                    placeholder="@username работника" 
+                    class="flex-1 border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                >
+                <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded">
+                    Добавить
+                </button>
+            </form>
+            <p class="text-sm text-gray-500 mt-2">
+                После добавления работник должен написать /start боту и пройти регистрацию через /register
+            </p>
+        </div>
+        
+        <!-- Employees grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for emp in employees %}
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="text-lg font-semibold">
+                            {% if emp.username %}
+                            <a href="https://t.me/{{ emp.username }}" target="_blank" class="text-blue-500 hover:text-blue-700">
+                                @{{ emp.username }}
+                            </a>
+                            {% else %}
+                            Работник
+                            {% endif %}
+                        </h3>
+                        {% if emp.registered %}
+                        <span class="text-sm text-green-600">✅ Зарегистрирован</span>
+                        {% else %}
+                        <span class="text-sm text-yellow-600">⏳ Ожидает регистрации</span>
+                        {% endif %}
+                    </div>
+                    <form method="post" action="/employees/delete/{{ emp.username }}" 
+                          onsubmit="return confirm('Удалить работника @{{ emp.username }}?')">
+                        <button type="submit" class="text-red-500 hover:text-red-700">🗑</button>
+                    </form>
+                </div>
+                
+                {% if emp.registered %}
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">ФИО:</span>
+                        <span>{{ emp.fio or '—' }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Должность:</span>
+                        <span>{{ emp.position or '—' }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Участок:</span>
+                        <span>{{ emp.area or '—' }}</span>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-gray-500 text-sm">Ожидает прохождения регистрации в боте</p>
+                {% endif %}
+                
+                <div class="mt-4 pt-4 border-t text-xs text-gray-400">
+                    Добавлен: {{ emp.added_at[:16] if emp.added_at else '—' }}
+                </div>
+            </div>
+            {% else %}
+            <div class="col-span-full bg-white rounded-lg shadow p-8 text-center text-gray-500">
+                <p class="text-lg mb-2">Работников пока нет</p>
+                <p class="text-sm">Добавьте работника через форму выше</p>
+            </div>
+            {% endfor %}
+        </div>
+    </main>
+</div>
+{% endblock %}

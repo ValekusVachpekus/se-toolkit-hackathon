@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Заблокированные — ЖКХ Админ-панель{% endblock %}
+{% block content %}
+<div class="flex">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-gray-800 min-h-screen p-4">
+        <div class="text-white text-xl font-bold mb-8">🏠 ЖКХ Панель</div>
+        <nav class="space-y-2">
+            <a href="/admin/dashboard" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 rounded">📊 Дашборд</a>
+            <a href="/admin/dashboard" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 rounded">📋 Жалобы</a>
+            <a href="/admin/employees" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 rounded">👷 Работники</a>
+            <a href="/admin/ratings" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 rounded">⭐ Рейтинги</a>
+            <a href="/admin/blocked" class="block px-4 py-2 text-white bg-gray-700 rounded">🚫 Заблокированные</a>
+            <a href="/logout" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 rounded mt-8">🚪 Выход</a>
+        </nav>
+    </aside>
+
+    <!-- Main content -->
+    <main class="flex-1 p-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-8">Заблокированные пользователи</h1>
+        
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr class="text-left text-gray-500 text-sm">
+                        <th class="px-6 py-3">User ID</th>
+                        <th class="px-6 py-3">Username</th>
+                        <th class="px-6 py-3">Заблокирован</th>
+                        <th class="px-6 py-3">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in blocked_users %}
+                    <tr class="border-t">
+                        <td class="px-6 py-4 font-mono">{{ user.user_id }}</td>
+                        <td class="px-6 py-4">
+                            {% if user.username %}
+                            <a href="https://t.me/{{ user.username }}" target="_blank" class="text-blue-500 hover:text-blue-700">
+                                @{{ user.username }}
+                            </a>
+                            {% else %}
+                            <span class="text-gray-400">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-gray-500">{{ user.blocked_at[:16] if user.blocked_at else '—' }}</td>
+                        <td class="px-6 py-4">
+                            <form method="post" action="/blocked/unblock/{{ user.user_id }}"
+                                  onsubmit="return confirm('Разблокировать пользователя {{ user.user_id }}?')">
+                                <button type="submit" class="text-green-500 hover:text-green-700">
+                                    🔓 Разблокировать
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="px-6 py-8 text-center text-gray-500">
+                            Заблокированных пользователей нет
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+{% endblock %}

@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Вход — ЖКХ Админ-панель{% endblock %}
+{% block title %}Вход — ЖКХ Панель{% endblock %}
 {% block content %}
 <div class="min-h-screen flex items-center justify-center">
     <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        <h1 class="text-2xl font-bold text-center mb-6 text-gray-800">🏠 ЖКХ Админ-панель</h1>
+        <h1 class="text-2xl font-bold text-center mb-6 text-gray-800">🏠 ЖКХ Панель</h1>
         
         {% if error %}
         <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -13,8 +13,36 @@
         
         <form method="post" action="/login">
             <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2">
+                    Вход как:
+                </label>
+                <div class="space-y-3">
+                    <label class="flex items-center">
+                        <input 
+                            type="radio" 
+                            name="role" 
+                            value="admin"
+                            {% if role == 'admin' %}checked{% endif %}
+                            class="mr-2"
+                        >
+                        <span class="text-gray-700">👨‍💼 Администратор</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input 
+                            type="radio" 
+                            name="role" 
+                            value="employee"
+                            {% if role == 'employee' %}checked{% endif %}
+                            class="mr-2"
+                        >
+                        <span class="text-gray-700">👷 Сотрудник</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="mb-6">
                 <label class="block text-gray-700 text-sm font-bold mb-2" for="password">
-                    Пароль администратора
+                    Пароль
                 </label>
                 <input 
                     type="password" 

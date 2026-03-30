@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Жалобы — ЖКХ Панель{% endblock %}
+{% block content %}
+<div class="flex">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-gray-800 min-h-screen p-4">
+        <div class="text-white text-xl font-bold mb-8">🏠 ЖКХ Панель</div>
+        <nav class="space-y-2">
+            <a href="/employee/complaints" class="block px-4 py-2 text-white bg-gray-700 rounded">📋 Жалобы</a>
+            <a href="/employee/ratings" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 rounded">⭐ Рейтинги</a>
+            <a href="/logout" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 rounded mt-8">🚪 Выход</a>
+        </nav>
+    </aside>
+
+    <!-- Main content -->
+    <main class="flex-1 p-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-8">Жалобы</h1>
+        
+        <!-- Filters -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <form method="get" class="flex flex-wrap gap-4 items-end">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Статус</label>
+                    <select name="status" class="border rounded px-3 py-2">
+                        <option value="">Все</option>
+                        <option value="pending" {% if current_status == 'pending' %}selected{% endif %}>Ожидают</option>
+                        <option value="accepted" {% if current_status == 'accepted' %}selected{% endif %}>Принятые</option>
+                        <option value="rejected" {% if current_status == 'rejected' %}selected{% endif %}>Отклонённые</option>
+                        <option value="blocked" {% if current_status == 'blocked' %}selected{% endif %}>Заблокированные</option>
+                    </select>
+                </div>
+                <div class="flex-1">
+                    <label class="block text-sm text-gray-600 mb-1">Поиск</label>
+                    <input type="text" name="search" value="{{ search }}" placeholder="ФИО, адрес или описание..." class="border rounded px-3 py-2 w-full">
+                </div>
+                <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white px-4 py-2 rounded">
+                    Найти
+                </button>
+                <a href="/employee/complaints" class="text-gray-500 hover:text-gray-700 px-4 py-2">Сбросить</a>
+            </form>
+        </div>
+
+        <!-- Results info -->
+        <div class="text-gray-600 mb-4">
+            Найдено: {{ total }} | Страница {{ page }} из {{ total_pages if total_pages > 0 else 1 }}
+        </div>
+
+        <!-- Complaints table -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr class="text-left text-gray-500 text-sm">
+                        <th class="px-6 py-3">ID</th>
+                        <th class="px-6 py-3">ФИО</th>
+                        <th class="px-6 py-3">Адрес</th>
+                        <th class="px-6 py-3">Описание</th>
+                        <th class="px-6 py-3">Статус</th>
+                        <th class="px-6 py-3">Дата</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in complaints %}
+                    <tr class="border-t hover:bg-gray-50 cursor-pointer" onclick="window.location='/employee/complaints/{{ c.id }}'">
+                        <td class="px-6 py-4 text-blue-500">#{{ c.id }}</td>
+                        <td class="px-6 py-4">{{ c.fio }}</td>
+                        <td class="px-6 py-4 text-gray-600">{{ c.address[:30] }}{% if c.address|length > 30 %}...{% endif %}</td>
+                        <td class="px-6 py-4 text-gray-600">{{ c.description[:40] }}{% if c.description|length > 40 %}...{% endif %}</td>
+                        <td class="px-6 py-4">
+                            {% if c.status == 'pending' %}
+                            <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-sm">Ожидает</span>
+                            {% elif c.status == 'accepted' %}
+                            <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">Принята</span>
+                            {% elif c.status == 'rejected' %}
+                            <span class="px-2 py-1 bg-red-100 text-red-800 rounded text-sm">Отклонена</span>
+                            {% elif c.status == 'blocked' %}
+                            <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm">Заблокирован</span>
+                            {% else %}
+                            <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm">{{ c.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-gray-500 text-sm">{{ c.created_at[:16] }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">Жалоб не найдено</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+        <div class="flex justify-center gap-2 mt-6">
+            {% if page > 1 %}
+            <a href="?page={{ page - 1 }}{% if current_status %}&status={{ current_status }}{% endif %}{% if search %}&search={{ search }}{% endif %}" 
+               class="px-4 py-2 bg-white rounded shadow hover:bg-gray-50">← Назад</a>
+            {% endif %}
+            
+            <span class="px-4 py-2 bg-blue-500 text-white rounded">{{ page }}</span>
+            
+            {% if page < total_pages %}
+            <a href="?page={{ page + 1 }}{% if current_status %}&status={{ current_status }}{% endif %}{% if search %}&search={{ search }}{% endif %}" 
+               class="px-4 py-2 bg-white rounded shadow hover:bg-gray-50">Вперёд →</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </main>
+</div>
+{% endblock %}
