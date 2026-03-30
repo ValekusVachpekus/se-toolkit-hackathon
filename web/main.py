@@ -1,5 +1,6 @@
 from datetime import datetime
 import aiohttp
+import os
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
@@ -10,7 +11,6 @@ from web.auth import check_auth, check_admin_auth, check_employee_auth, get_user
 from web.config import ADMIN_PASSWORD, MEDIA_DIR, SECRET_KEY
 from web.database import get_db
 from web.logging_config import setup_logging, get_logger
-import os
 
 setup_logging()
 logger = get_logger(__name__)
@@ -21,28 +21,118 @@ templates = Jinja2Templates(directory="web/templates")
 app.mount("/static", StaticFiles(directory="web/static"), name="static")
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+LOG_CHAT_ID = int(os.getenv("LOG_CHAT_ID", "0"))
 
-async def send_notification(user_id: int, message: str):
-    """Send notification to user via Telegram bot"""
+
+async def send_telegram_message(chat_id: int, text: str, parse_mode: str = "HTML") -> bool:
+    """Send message via Telegram bot API"""
     if not BOT_TOKEN:
-        logger.warning("⚠️ BOT_TOKEN not configured, cannot send notification")
-        return
+        logger.warning("⚠️ BOT_TOKEN not configured")
+        return False
     
     try:
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json={"chat_id": user_id, "text": message}) as resp:
+            async with session.post(url, json={
+                "chat_id": chat_id, 
+                "text": text,
+                "parse_mode": parse_mode
+            }) as resp:
                 if resp.status == 200:
-                    logger.info(f"✅ Notification sent to user {user_id}")
+                    return True
                 else:
-                    logger.warning(f"⚠️ Failed to send notification to {user_id}: {resp.status}")
+                    logger.warning(f"⚠️ Failed to send message to {chat_id}: {resp.status}")
+                    return False
     except Exception as e:
-        logger.error(f"❌ Error sending notification: {e}")
+        logger.error(f"❌ Error sending message: {e}")
+        return False
+
+
+async def send_notification(user_id: int, message: str):
+    """Send notification to user via Telegram bot"""
+    if await send_telegram_message(user_id, message):
+        logger.info(f"✅ Notification sent to user {user_id}")
+
+
+async def log_to_archive_group(
+    complaint_id: int,
+    action: str,  # "принята" or "отклонена"
+    actor_id: int | None,
+    actor_username: str | None,
+    reason: str | None = None
+):
+    """Log complaint action to archive group (LOG_CHAT_ID) like bot does"""
+    if not LOG_CHAT_ID:
+        return
+    
+    db = get_db()
+    complaint = db.execute(
+        "SELECT user_id, username, fio, address, description, media_file_id, media_type FROM complaints WHERE id = ?",
+        (complaint_id,)
+    ).fetchone()
+    
+    emp = None
+    if actor_id:
+        emp = db.execute(
+            "SELECT fio, position, area FROM employees WHERE user_id = ?",
+            (actor_id,)
+        ).fetchone()
+    db.close()
+    
+    if not complaint:
+        return
+    
+    action_emoji = "✅" if action == "принята" else "❌"
+    actor_uname = f"@{actor_username}" if actor_username else (f"ID: {actor_id}" if actor_id else "Администратор")
+    uname = f"@{complaint['username']}" if complaint['username'] else f"ID: {complaint['user_id']}"
+    
+    complaint_text = (
+        f"{action_emoji} <b>Жалоба №{complaint_id} {action}</b> ({actor_uname})\n\n"
+        f"👤 <b>От:</b> {uname} (ID: <code>{complaint['user_id']}</code>)\n"
+        f"📋 <b>ФИО заявителя:</b> {complaint['fio']}\n"
+        f"🏠 <b>Адрес:</b> {complaint['address']}\n"
+        f"📝 <b>Суть жалобы:</b> {complaint['description']}"
+    )
+    
+    if reason:
+        complaint_text += f"\n📝 <b>Причина отказа:</b> {reason}"
+    
+    if complaint['media_type'] == 'link' and complaint['media_file_id']:
+        complaint_text += f"\n🔗 <b>Фото/видео:</b> {complaint['media_file_id']}"
+    
+    await send_telegram_message(LOG_CHAT_ID, complaint_text)
+    
+    # Staff card
+    if emp:
+        staff_text = (
+            f"🔧 <b>Карточка работника</b>\n\n"
+            f"📋 ФИО: {emp['fio'] or '—'}\n"
+            f"🏷 Должность: {emp['position'] or '—'}\n"
+            f"📍 Участок: {emp['area'] or '—'}\n"
+            f"🔗 Telegram: {actor_uname}"
+        )
+    else:
+        staff_text = (
+            f"🔧 <b>Карточка работника</b>\n\n"
+            f"🔗 Telegram: {actor_uname}\n"
+            f"(Администратор)"
+        )
+    await send_telegram_message(LOG_CHAT_ID, staff_text)
+
+
+def cleanup_expired_codes():
+    """Remove expired verification codes from database"""
+    db = get_db()
+    db.execute("DELETE FROM verification_codes WHERE expires_at < datetime('now')")
+    db.commit()
+    db.close()
 
 
 @app.on_event("startup")
 async def startup_event():
     logger.info("🌐 Web-панель запущена")
+    # Cleanup expired verification codes on startup
+    cleanup_expired_codes()
 
 
 @app.on_event("shutdown")
@@ -57,7 +147,10 @@ async def shutdown_event():
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     if check_auth(request):
-        return RedirectResponse(url="/admin/complaints", status_code=302)
+        role = get_user_role(request)
+        if role == "employee":
+            return RedirectResponse(url="/employee/complaints", status_code=302)
+        return RedirectResponse(url="/admin/dashboard", status_code=302)
     else:
         return RedirectResponse(url="/login", status_code=302)
 
@@ -124,6 +217,7 @@ async def login(request: Request):
         response = RedirectResponse(url="/employee/complaints", status_code=302)
         response.set_cookie("auth_token", SECRET_KEY, httponly=True, max_age=86400 * 7)
         response.set_cookie("user_role", "employee", httponly=True, max_age=86400 * 7)
+        response.set_cookie("employee_user_id", str(user_id), httponly=True, max_age=86400 * 7)
         return response
 
 
@@ -132,6 +226,7 @@ async def logout():
     response = RedirectResponse(url="/login", status_code=302)
     response.delete_cookie("auth_token")
     response.delete_cookie("user_role")
+    response.delete_cookie("employee_user_id")
     return response
 
 
@@ -279,7 +374,15 @@ async def admin_accept_complaint(request: Request, complaint_id: int):
     db.close()
     
     if complaint:
-        await send_notification(complaint["user_id"], f"✅ Жалоба #{complaint_id} принята в работу")
+        # Detailed notification like bot sends
+        notification = (
+            f"✅ <b>Ваша жалоба №{complaint_id} принята!</b>\n\n"
+            f"Работник будет направлен для устранения проблемы.\n\n"
+            f"💡 После выполнения работы вы сможете оценить качество обслуживания."
+        )
+        await send_notification(complaint["user_id"], notification)
+        # Log to archive group
+        await log_to_archive_group(complaint_id, "принята", None, None)
     
     return RedirectResponse(url=f"/admin/complaints/{complaint_id}", status_code=302)
 
@@ -302,10 +405,12 @@ async def admin_reject_complaint(request: Request, complaint_id: int):
     db.close()
     
     if complaint:
-        msg = f"❌ Жалоба #{complaint_id} отклонена"
+        msg = f"❌ Ваша жалоба №{complaint_id} отклонена."
         if reason:
-            msg += f"\n\nПричина: {reason}"
+            msg += f"\n\n📝 <b>Причина:</b> {reason}"
         await send_notification(complaint["user_id"], msg)
+        # Log to archive group
+        await log_to_archive_group(complaint_id, "отклонена", None, None, reason)
     
     return RedirectResponse(url=f"/admin/complaints/{complaint_id}", status_code=302)
 
@@ -516,17 +621,50 @@ async def employee_accept_complaint(request: Request, complaint_id: int):
     if not check_employee_auth(request):
         return RedirectResponse(url="/login?role=employee", status_code=302)
     
+    employee_user_id = request.cookies.get("employee_user_id")
+    if not employee_user_id:
+        return RedirectResponse(url="/login?role=employee", status_code=302)
+    
+    employee_user_id = int(employee_user_id)
+    
     db = get_db()
     complaint = db.execute("SELECT user_id FROM complaints WHERE id = ?", (complaint_id,)).fetchone()
+    emp = db.execute(
+        "SELECT fio, position, area, username FROM employees WHERE user_id = ?",
+        (employee_user_id,)
+    ).fetchone()
     db.execute(
-        "UPDATE complaints SET status = 'accepted' WHERE id = ? AND status = 'pending'",
-        (complaint_id,)
+        "UPDATE complaints SET status = 'accepted', accepted_by = ? WHERE id = ? AND status = 'pending'",
+        (employee_user_id, complaint_id)
     )
     db.commit()
     db.close()
     
     if complaint:
-        await send_notification(complaint["user_id"], f"✅ Жалоба #{complaint_id} принята в работу")
+        # Detailed notification with worker info like bot sends
+        if emp:
+            notification = (
+                f"✅ <b>Ваша жалоба №{complaint_id} принята!</b>\n\n"
+                f"Работник будет направлен для устранения проблемы.\n\n"
+                f"👷 <b>Информация о работнике:</b>\n"
+                f"📋 ФИО: {emp['fio'] or '—'}\n"
+                f"🏷 Должность: {emp['position'] or '—'}\n"
+                f"📍 Участок: {emp['area'] or '—'}\n\n"
+                f"💡 После выполнения работы вы сможете оценить качество обслуживания."
+            )
+        else:
+            notification = (
+                f"✅ <b>Ваша жалоба №{complaint_id} принята!</b>\n\n"
+                f"Работник будет направлен для устранения проблемы.\n\n"
+                f"💡 После выполнения работы вы сможете оценить качество обслуживания."
+            )
+        await send_notification(complaint["user_id"], notification)
+        # Log to archive group
+        await log_to_archive_group(
+            complaint_id, "принята", 
+            employee_user_id, 
+            emp['username'] if emp else None
+        )
     
     return RedirectResponse(url=f"/employee/complaints/{complaint_id}", status_code=302)
 
@@ -535,6 +673,14 @@ async def employee_accept_complaint(request: Request, complaint_id: int):
 async def employee_reject_complaint(request: Request, complaint_id: int):
     if not check_employee_auth(request):
         return RedirectResponse(url="/login?role=employee", status_code=302)
+    
+    employee_user_id = request.cookies.get("employee_user_id")
+    employee_username = None
+    if employee_user_id:
+        db_temp = get_db()
+        emp = db_temp.execute("SELECT username FROM employees WHERE user_id = ?", (employee_user_id,)).fetchone()
+        employee_username = emp['username'] if emp else None
+        db_temp.close()
     
     form = await request.form()
     reason = form.get("reason", "").strip()
@@ -549,10 +695,17 @@ async def employee_reject_complaint(request: Request, complaint_id: int):
     db.close()
     
     if complaint:
-        msg = f"❌ Жалоба #{complaint_id} отклонена"
+        msg = f"❌ Ваша жалоба №{complaint_id} отклонена."
         if reason:
-            msg += f"\n\nПричина: {reason}"
+            msg += f"\n\n📝 <b>Причина:</b> {reason}"
         await send_notification(complaint["user_id"], msg)
+        # Log to archive group
+        await log_to_archive_group(
+            complaint_id, "отклонена",
+            int(employee_user_id) if employee_user_id else None,
+            employee_username,
+            reason
+        )
     
     return RedirectResponse(url=f"/employee/complaints/{complaint_id}", status_code=302)
 
@@ -649,55 +802,13 @@ async def api_stats(request: Request):
 
 
 # ---------------------------------------------------------------------------
-# Account linking (redirect to login after)
+# Account linking - redirect to login (employee login handles codes)
 # ---------------------------------------------------------------------------
 
-@app.get("/link_account", response_class=HTMLResponse)
-async def link_account_get(request: Request):
-    return templates.TemplateResponse("link_account.html", {"request": request})
-
-
-@app.post("/link_account")
-async def link_account_post(request: Request):
-    form = await request.form()
-    code = form.get("code", "").strip()
-    
-    if not code or len(code) != 6 or not code.isdigit():
-        return templates.TemplateResponse("link_account.html", {
-            "request": request,
-            "error": "Код должен содержать 6 цифр"
-        })
-    
-    db = get_db()
-    
-    verification = db.execute(
-        "SELECT user_id, username FROM verification_codes WHERE code=? AND used=0 AND expires_at > datetime('now')",
-        (code,)
-    ).fetchone()
-    
-    if not verification:
-        db.close()
-        return templates.TemplateResponse("link_account.html", {
-            "request": request,
-            "error": "Неверный или истёкший код"
-        })
-    
-    user_id, username = verification
-    
-    db.execute("UPDATE verification_codes SET used=1 WHERE code=?", (code,))
-    db.execute(
-        "UPDATE employees SET web_linked=1 WHERE user_id=?",
-        (user_id,)
-    )
-    db.commit()
-    db.close()
-    
-    logger.info(f"🔗 Аккаунт {username} ({user_id}) связан с веб-панелью")
-    
-    response = RedirectResponse(url="/login?role=employee", status_code=302)
-    response.set_cookie("auth_token", SECRET_KEY, httponly=True, max_age=86400 * 7)
-    response.set_cookie("user_role", "employee", httponly=True, max_age=86400 * 7)
-    return response
+@app.get("/link_account")
+async def link_account_redirect(request: Request):
+    """Redirect to employee login - it handles verification codes"""
+    return RedirectResponse(url="/login?role=employee", status_code=302)
 
 
 if __name__ == "__main__":

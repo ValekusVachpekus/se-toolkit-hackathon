@@ -49,6 +49,15 @@ async def init_db() -> None:
                 message_id   INTEGER NOT NULL
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS verification_codes (
+                code       TEXT PRIMARY KEY,
+                user_id    INTEGER NOT NULL,
+                username   TEXT,
+                used       INTEGER DEFAULT 0,
+                expires_at TIMESTAMP NOT NULL
+            )
+        """)
         # Migrations for existing databases
         for col_sql in [
             "ALTER TABLE complaints ADD COLUMN address TEXT NOT NULL DEFAULT '—'",
@@ -58,6 +67,7 @@ async def init_db() -> None:
             "ALTER TABLE complaints ADD COLUMN review TEXT",
             "ALTER TABLE complaints ADD COLUMN rated_at TIMESTAMP",
             "ALTER TABLE complaints ADD COLUMN rejection_reason TEXT",
+            "ALTER TABLE employees ADD COLUMN web_linked INTEGER DEFAULT 0",
         ]:
             try:
                 await db.execute(col_sql)
