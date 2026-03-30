@@ -8,6 +8,11 @@ from datetime import datetime
 import aiohttp
 import os
 
+from dotenv import load_dotenv
+from pathlib import Path
+
+load_dotenv()
+
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -28,35 +33,287 @@ app.mount("/static", StaticFiles(directory="web/static"), name="static")
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 LOG_CHAT_ID = int(os.getenv("LOG_CHAT_ID", "0"))
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
 
-async def send_telegram_message(chat_id: int, text: str, parse_mode: str = "HTML") -> bool:
+async def send_telegram_message(chat_id: int, text: str, parse_mode: str = "HTML", reply_markup: list | None = None) -> bool:
     """Send message via Telegram bot API"""
     if not BOT_TOKEN:
         logger.warning("⚠️ BOT_TOKEN not configured")
         return False
-    
+
     try:
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        data = {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": parse_mode,
+        }
+        if reply_markup:
+            data["reply_markup"] = {"inline_keyboard": reply_markup}
+        
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json={
-                "chat_id": chat_id, 
-                "text": text,
-                "parse_mode": parse_mode
-            }) as resp:
+            async with session.post(url, json=data) as resp:
                 if resp.status == 200:
-                    return True
+                    result = await resp.json()
+                    return result.get("result", {}).get("message_id")
                 else:
                     logger.warning(f"⚠️ Failed to send message to {chat_id}: {resp.status}")
-                    return False
+                    return None
     except Exception as e:
         logger.error(f"❌ Error sending message: {e}")
-        return False
+        return None
+
+
+async def upload_media_to_telegram(media_type: str, file_path: str) -> str | None:
+    """Upload media file to Telegram and return file_id"""
+    if not BOT_TOKEN:
+        logger.warning("⚠️ BOT_TOKEN not configured, cannot upload media")
+        return None
+
+    try:
+        logger.info(f"📤 Uploading {media_type} to Telegram: {file_path}")
+        
+        endpoint = {
+            "photo": "sendPhoto",
+            "video": "sendVideo",
+            "document": "sendDocument",
+        }.get(media_type, "sendDocument")
+
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/{endpoint}"
+
+        # Send to a dummy chat (we just need the file_id)
+        # Use ADMIN_ID as dummy chat if available, otherwise use a placeholder
+        dummy_chat_id = ADMIN_ID if ADMIN_ID else 123456789
+        logger.info(f"   Using dummy chat_id: {dummy_chat_id}")
+
+        async with aiohttp.ClientSession() as session:
+            with open(file_path, 'rb') as f:
+                form_data = aiohttp.FormData()
+                form_data.add_field("chat_id", str(dummy_chat_id))
+                form_data.add_field(media_type, f, filename=file_path.split('/')[-1])
+
+                async with session.post(url, data=form_data) as resp:
+                    if resp.status == 200:
+                        result = await resp.json()
+                        # Extract file_id from the response
+                        if media_type == "photo":
+                            file_id = result["result"]["photo"][-1]["file_id"]
+                        elif media_type == "video":
+                            file_id = result["result"]["video"]["file_id"]
+                        else:
+                            file_id = result["result"]["document"]["file_id"]
+                        logger.info(f"✅ Uploaded media to Telegram, file_id: {file_id[:20]}...")
+                        return file_id
+                    else:
+                        logger.warning(f"⚠️ Failed to upload media: {resp.status}")
+                        return None
+    except Exception as e:
+        logger.error(f"❌ Error uploading media: {e}")
+        return None
+
+
+async def send_media_message(chat_id: int, media_type: str, media_file_id: str, caption: str, reply_markup: list | None = None) -> int | None:
+    """Send media message via Telegram Bot API.
+    
+    media_file_id can be:
+    - Telegram file_id (e.g., "AgACAgIAAxkDAAIB...")
+    - HTTP URL (e.g., "https://example.com/image.jpg")
+    - Local file path (e.g., "123_abc.jpg")
+    """
+    if not BOT_TOKEN:
+        return None
+
+    try:
+        # Determine the type of media_file_id
+        is_url = media_file_id.startswith("http://") or media_file_id.startswith("https://")
+        is_local_file = not is_url and "/" in media_file_id and "." in media_file_id.split("/")[-1]
+        is_telegram_file_id = not is_url and not is_local_file and len(media_file_id) > 20
+        
+        endpoint = {
+            "photo": "sendPhoto",
+            "video": "sendVideo",
+            "document": "sendDocument",
+        }.get(media_type, "sendDocument")
+        
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/{endpoint}"
+        
+        if is_telegram_file_id:
+            # Send using existing Telegram file_id
+            data = {
+                "chat_id": chat_id,
+                media_type: media_file_id,
+                "caption": caption,
+                "parse_mode": "HTML",
+            }
+            if reply_markup:
+                data["reply_markup"] = {"inline_keyboard": reply_markup}
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=data) as resp:
+                    if resp.status == 200:
+                        result = await resp.json()
+                        return result.get("result", {}).get("message_id")
+                    else:
+                        logger.warning(f"⚠️ Failed to send media to {chat_id}: {resp.status}")
+                        return None
+                        
+        elif is_url:
+            # Send by URL
+            data = {
+                "chat_id": chat_id,
+                media_type: media_file_id,
+                "caption": caption,
+                "parse_mode": "HTML",
+            }
+            if reply_markup:
+                data["reply_markup"] = {"inline_keyboard": reply_markup}
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=data) as resp:
+                    if resp.status == 200:
+                        result = await resp.json()
+                        return result.get("result", {}).get("message_id")
+                    else:
+                        logger.warning(f"⚠️ Failed to send media to {chat_id}: {resp.status}")
+                        return None
+                        
+        else:
+            # Local file path - need to upload
+            file_path = MEDIA_DIR / media_file_id
+            if not file_path.exists():
+                logger.warning(f"Media file not found: {file_path}")
+                return None
+
+            data = {
+                "chat_id": chat_id,
+                "caption": caption,
+                "parse_mode": "HTML",
+            }
+            if reply_markup:
+                data["reply_markup"] = {"inline_keyboard": reply_markup}
+
+            async with aiohttp.ClientSession() as session:
+                with open(file_path, 'rb') as f:
+                    form_data = aiohttp.FormData()
+                    for key, value in data.items():
+                        form_data.add_field(key, value)
+                    form_data.add_field(media_type, f, filename=media_file_id)
+
+                    async with session.post(url, data=form_data) as resp:
+                        if resp.status == 200:
+                            result = await resp.json()
+                            return result.get("result", {}).get("message_id")
+                        else:
+                            logger.warning(f"⚠️ Failed to send media to {chat_id}: {resp.status}")
+                            return None
+    except Exception as e:
+        logger.error(f"❌ Error sending media message: {e}")
+        return None
+
+
+def get_complaint_keyboard(complaint_id: int) -> list:
+    """Build inline keyboard for complaint"""
+    return [[
+        {"text": "✅ Принять", "callback_data": f"accept_{complaint_id}"},
+        {"text": "❌ Отклонить", "callback_data": f"reject_{complaint_id}"},
+        {"text": "🚫 Заблокировать", "callback_data": f"block_{complaint_id}"},
+    ]]
+
+
+def build_complaint_text(complaint_id, uname, user_id, fio, address, description) -> str:
+    """Build complaint message text"""
+    return (
+        f"📨 <b>Новая жалоба #{complaint_id}</b>\n\n"
+        f"👤 <b>От:</b> {uname} (ID: <code>{user_id}</code>)\n"
+        f"📋 <b>ФИО заявителя:</b> {fio}\n"
+        f"🏠 <b>Адрес:</b> {address}\n"
+        f"📝 <b>Суть жалобы:</b> {description}"
+    )
+
+
+async def notify_workers_about_complaint(complaint_id: int, user_id: int, fio: str, address: str,
+                                          description: str, media_file_id: str | None,
+                                          media_type: str | None, media_local_path: str | None):
+    """Send complaint notification to admin and all registered employees"""
+    db = get_db()
+    
+    logger.info(f"📢 Notifying workers about complaint #{complaint_id}")
+    logger.info(f"   media_file_id={media_file_id}, media_type={media_type}, media_local_path={media_local_path}")
+
+    # Get all recipients (admin + employees)
+    recipients = [ADMIN_ID] if ADMIN_ID else []
+    employees = db.execute("SELECT user_id FROM employees WHERE registered=1 AND user_id IS NOT NULL").fetchall()
+    recipients.extend([e[0] for e in employees if e[0]])
+    
+    logger.info(f"   Recipients: {recipients}")
+
+    # Get username for the complainant
+    user_info = db.execute("SELECT username FROM complaints WHERE id=?", (complaint_id,)).fetchone()
+    username = user_info[0] if user_info and user_info[0] else None
+
+    # Upload media to Telegram if we have a local file
+    telegram_file_id = None
+    if media_local_path and media_type:
+        logger.info(f"📤 Uploading media to Telegram...")
+        telegram_file_id = await upload_media_to_telegram(media_type, media_local_path)
+        if telegram_file_id:
+            # Update DB with the real Telegram file_id
+            db.execute(
+                "UPDATE complaints SET media_file_id = ? WHERE id = ?",
+                (telegram_file_id, complaint_id)
+            )
+            db.commit()
+            logger.info(f"✅ Updated complaint #{complaint_id} with Telegram file_id: {telegram_file_id[:20]}...")
+
+    uname = f"@{username}" if username else f"ID: {user_id}"
+    text = build_complaint_text(complaint_id, uname, user_id, fio, address, description)
+    keyboard = get_complaint_keyboard(complaint_id)
+
+    # Use the Telegram file_id for sending to all recipients
+    final_file_id = telegram_file_id if telegram_file_id else (media_file_id if media_type != "link" else None)
+
+    msg_rows = []
+
+    for rid in recipients:
+        try:
+            if final_file_id and media_type and media_type != "link":
+                # Send media with file_id from Telegram
+                logger.info(f"   Sending media to {rid}...")
+                message_id = await send_media_message(rid, media_type, final_file_id, text, keyboard)
+                if message_id:
+                    msg_rows.append((complaint_id, rid, message_id))
+                    logger.info(f"   ✅ Sent to {rid}, message_id={message_id}")
+            elif media_file_id and media_type == "link":
+                # Send text with link
+                full_text = text + f"\n🔗 <b>Доказательство:</b> {media_file_id}"
+                message_id = await send_telegram_message(rid, full_text, "HTML", keyboard)
+                if message_id:
+                    msg_rows.append((complaint_id, rid, message_id))
+            else:
+                # Send text only
+                message_id = await send_telegram_message(rid, text, "HTML", keyboard)
+                if message_id:
+                    msg_rows.append((complaint_id, rid, message_id))
+        except Exception as e:
+            logger.warning("Could not send complaint to %s: %s", rid, e)
+
+    # Save message IDs for later inline keyboard editing
+    if msg_rows:
+        db.executemany(
+            "INSERT INTO complaint_messages (complaint_id, chat_id, message_id) VALUES (?,?,?)",
+            msg_rows,
+        )
+        db.commit()
+
+    db.close()
+    logger.info(f"📨 Жалоба #{complaint_id} отправлена {len(recipients)} получателям")
 
 
 async def send_notification(user_id: int, message: str):
     """Send notification to user via Telegram bot"""
-    if await send_telegram_message(user_id, message):
+    message_id = await send_telegram_message(user_id, message)
+    if message_id:
         logger.info(f"✅ Notification sent to user {user_id}")
 
 
@@ -854,41 +1111,40 @@ async def new_complaint_form(request: Request):
 async def submit_complaint(request: Request):
     if not check_user_auth(request):
         return RedirectResponse(url="/login?role=user", status_code=302)
-    
+
     user_id = int(request.cookies.get("user_user_id", "0"))
     form = await request.form()
-    
+
     fio = form.get("fio", "").strip()
     address = form.get("address", "").strip()
     description = form.get("description", "").strip()
-    
+
     if not fio or not address or not description:
         return templates.TemplateResponse("user/complaint_form.html", {
             "request": request,
             "error": "Все поля обязательны для заполнения",
         })
-    
+
     # Handle media upload
     media_file = form.get("media")
     media_link = form.get("media_link", "").strip()
-    
+
     media_file_id = None
     media_type = None
     media_local_path = None
-    
+
     if media_file and hasattr(media_file, 'filename') and media_file.filename:
         # Upload file
-        import os
         import uuid
         from pathlib import Path
-        
+
         ext = Path(media_file.filename).suffix.lower()
         if not ext:
             ext = ".bin"
-        
+
         filename = f"{user_id}_{uuid.uuid4().hex[:10]}{ext}"
         local_path = MEDIA_DIR / filename
-        
+
         # Determine media type
         if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
             media_type = "photo"
@@ -896,21 +1152,21 @@ async def submit_complaint(request: Request):
             media_type = "video"
         else:
             media_type = "document"
-        
+
         # Save file
         content = await media_file.read()
         with open(local_path, 'wb') as f:
             f.write(content)
-        
+
         media_local_path = str(local_path)
         media_file_id = filename  # Store filename for reference
-    
+
     elif media_link:
         # Use link
         if media_link.startswith("http://") or media_link.startswith("https://"):
             media_file_id = media_link
             media_type = "link"
-    
+
     # Save complaint
     db = get_db()
     username = None  # Will be filled if linked
@@ -922,9 +1178,16 @@ async def submit_complaint(request: Request):
     complaint_id = cursor.lastrowid
     db.commit()
     db.close()
-    
+
     logger.info(f"📨 Новая жалоба #{complaint_id} от пользователя {user_id} (веб-панель)")
-    
+    logger.info(f"   Media: file_id={media_file_id}, type={media_type}, local_path={media_local_path}")
+
+    # Notify workers via Telegram
+    await notify_workers_about_complaint(
+        complaint_id, user_id, fio, address, description,
+        media_file_id, media_type, media_local_path
+    )
+
     return RedirectResponse(url=f"/user/complaints/{complaint_id}", status_code=302)
 
 
