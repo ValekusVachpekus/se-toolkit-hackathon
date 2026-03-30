@@ -18,6 +18,9 @@ async def init_db() -> None:
                 media_local_path TEXT,
                 status        TEXT DEFAULT 'pending',
                 accepted_by   INTEGER,
+                rating        INTEGER,
+                review        TEXT,
+                rated_at      TIMESTAMP,
                 created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -51,6 +54,9 @@ async def init_db() -> None:
             "ALTER TABLE complaints ADD COLUMN address TEXT NOT NULL DEFAULT '—'",
             "ALTER TABLE complaints ADD COLUMN accepted_by INTEGER",
             "ALTER TABLE complaints ADD COLUMN media_local_path TEXT",
+            "ALTER TABLE complaints ADD COLUMN rating INTEGER",
+            "ALTER TABLE complaints ADD COLUMN review TEXT",
+            "ALTER TABLE complaints ADD COLUMN rated_at TIMESTAMP",
         ]:
             try:
                 await db.execute(col_sql)

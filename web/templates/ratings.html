@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold mb-6">⭐ Рейтинги и отзывы</h1>
+    
+    <!-- Статистика работников -->
+    <div class="bg-white rounded-lg shadow p-6 mb-8">
+        <h2 class="text-2xl font-semibold mb-4">👷 Рейтинг работников</h2>
+        
+        {% if employees_stats %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full border">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="border px-4 py-2">Место</th>
+                        <th class="border px-4 py-2">ФИО</th>
+                        <th class="border px-4 py-2">Должность</th>
+                        <th class="border px-4 py-2">Рейтинг</th>
+                        <th class="border px-4 py-2">Жалоб</th>
+                        <th class="border px-4 py-2">Оценок</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for emp in employees_stats %}
+                    <tr class="border-b">
+                        <td class="border px-4 py-2">{{ loop.index }}</td>
+                        <td class="border px-4 py-2">{{ emp[2] or '—' }}</td>
+                        <td class="border px-4 py-2">{{ emp[3] or '—' }}</td>
+                        <td class="border px-4 py-2">
+                            {% if emp[6] %}
+                                ⭐ {{ "%.1f" | format(emp[6]) }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td class="border px-4 py-2">{{ emp[5] }}</td>
+                        <td class="border px-4 py-2">{{ emp[7] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-gray-500">Нет зарегистрированных работников.</p>
+        {% endif %}
+    </div>
+    
+    <!-- Отзывы -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-2xl font-semibold mb-4">💬 Отзывы</h2>
+        
+        {% if recent_reviews %}
+        <div class="space-y-4">
+            {% for review in recent_reviews %}
+            <div class="border-l-4 border-yellow-400 pl-4 py-2">
+                <div class="font-semibold">Жалоба #{{ review[0] }}</div>
+                <div class="text-yellow-500">⭐ {{ review[1] or 0 }}/5</div>
+                {% if review[2] %}
+                <div class="text-gray-700 italic mt-2">{{ review[2] }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-500">Отзывов пока нет.</p>
+        {% endif %}
+    </div>
+    
+    <div class="mt-6">
+        <a href="/" class="text-blue-600 hover:underline">← Назад</a>
+    </div>
+</div>
+{% endblock %}

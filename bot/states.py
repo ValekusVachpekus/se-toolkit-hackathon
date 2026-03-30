@@ -20,3 +20,8 @@ class AddEmployeeForm(StatesGroup):
 
 class RejectForm(StatesGroup):
     reason = State()
+
+
+class RatingForm(StatesGroup):
+    rating = State()
+    review = State()

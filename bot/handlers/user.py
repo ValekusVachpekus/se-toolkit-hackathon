@@ -9,7 +9,7 @@ from bot.database import get_all_recipient_ids, is_blocked
 from bot.keyboards import build_complaint_text
 from bot.logging_config import get_logger
 from bot.media_utils import download_media
-from bot.states import ComplaintForm
+from bot.states import ComplaintForm, RatingForm
 
 router = Router()
 logger = get_logger(__name__)
@@ -193,6 +193,16 @@ async def _submit_complaint(
     )
 
     await message.answer(f"✅ Ваша жалоба №{complaint_id} успешно отправлена на рассмотрение. Работник будет направлен для устранения проблемы.")
+
+    # Дополнительное уведомление о том, как отследить жалобу
+    await message.answer(
+        "📌 <b>Статус вашей жалобы:</b>\n\n"
+        "• Жалоба отправлена работникам\n"
+        "• Вы получите уведомление, когда работник примет жалобу\n"
+        "• После выполнения работы вы сможете оценить качество командой /rate\n\n"
+        "Спасибо за обращение!",
+        parse_mode="HTML"
+    )
 
     uname = f"@{username}" if username else "без username"
     text = build_complaint_text(complaint_id, uname, uid, fio, address, description)

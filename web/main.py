@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -8,11 +8,25 @@ from fastapi.templating import Jinja2Templates
 from web.auth import check_auth
 from web.config import ADMIN_PASSWORD, MEDIA_DIR, SECRET_KEY
 from web.database import get_db
+from web.logging_config import setup_logging, get_logger
+
+setup_logging()
+logger = get_logger(__name__)
 
 app = FastAPI(title="ЖКХ Админ-панель")
 
 templates = Jinja2Templates(directory="web/templates")
 app.mount("/static", StaticFiles(directory="web/static"), name="static")
+
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info("🌐 Web-панель запущена")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("🛑 Web-панель остановлена")
 
 
 # ---------------------------------------------------------------------------
@@ -30,10 +44,14 @@ async def login_page(request: Request, error: str = None):
 async def login(request: Request):
     form = await request.form()
     password = form.get("password", "")
+    
     if password == ADMIN_PASSWORD:
+        logger.info("✅ Успешный вход администратора")
         response = RedirectResponse(url="/", status_code=302)
         response.set_cookie("auth_token", SECRET_KEY, httponly=True, max_age=86400 * 7)
         return response
+    
+    logger.warning("❌ Неудачная попытка входа (неверный пароль)")
     return RedirectResponse(url="/login?error=1", status_code=302)
 
 
@@ -323,6 +341,62 @@ async def api_stats(request: Request):
     }
     db.close()
     return stats
+
+
+# ---------------------------------------------------------------------------
+# Rating statistics
+# ---------------------------------------------------------------------------
+
+@app.get("/ratings", response_class=HTMLResponse)
+async def ratings(request: Request):
+    if not check_auth(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    db = get_db()
+    
+    # Статистика по работникам
+    employees_stats = db.execute("""
+        SELECT 
+            e.user_id,
+            e.username,
+            e.fio,
+            e.position,
+            e.area,
+            COUNT(c.id) as total_accepted,
+            AVG(c.rating) as avg_rating,
+            COUNT(CASE WHEN c.rating IS NOT NULL THEN 1 END) as rated_count
+        FROM employees e
+        LEFT JOIN complaints c ON e.user_id = c.accepted_by
+        WHERE e.registered = 1
+        GROUP BY e.user_id
+        ORDER BY CASE WHEN avg_rating IS NULL THEN 1 ELSE 0 END, avg_rating DESC, total_accepted DESC
+    """).fetchall()
+    
+    # Последние отзывы
+    recent_reviews = db.execute("""
+        SELECT 
+            c.id,
+            c.rating,
+            c.review,
+            c.rated_at,
+            c.user_id,
+            c.username as user_username,
+            e.fio as employee_fio,
+            e.position
+        FROM complaints c
+        LEFT JOIN employees e ON c.accepted_by = e.user_id
+        WHERE c.rating IS NOT NULL
+        ORDER BY c.rated_at DESC
+        LIMIT 10
+    """).fetchall()
+    
+    db.close()
+    
+    return templates.TemplateResponse("ratings.html", {
+        "request": request,
+        "employees_stats": employees_stats,
+        "recent_reviews": recent_reviews,
+    })
 
 
 if __name__ == "__main__":

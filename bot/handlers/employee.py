@@ -193,6 +193,13 @@ async def accept_complaint(callback: CallbackQuery) -> None:
             (callback.from_user.id, complaint_id),
         )
         await db.commit()
+        
+        # Получить инфо работника
+        async with db.execute(
+            "SELECT fio, position, area FROM employees WHERE user_id=?",
+            (callback.from_user.id,)
+        ) as cur:
+            emp = await cur.fetchone()
 
     actor_name = callback.from_user.username or str(callback.from_user.id)
     logger.info(
@@ -200,8 +207,26 @@ async def accept_complaint(callback: CallbackQuery) -> None:
         complaint_id, callback.from_user.id, actor_name
     )
 
+    # Уведомление пользователю с инфо работника
     try:
-        await callback.bot.send_message(user_id, f"✅ Ваша жалоба №{complaint_id} принята. Работник будет направлен для устранения проблемы.")
+        if emp:
+            emp_fio, emp_position, emp_area = emp
+            notification = (
+                f"✅ <b>Ваша жалоба №{complaint_id} принята!</b>\n\n"
+                f"Работник будет направлен для устранения проблемы.\n\n"
+                f"👷 <b>Информация о работнике:</b>\n"
+                f"📋 ФИО: {emp_fio or '—'}\n"
+                f"🏷 Должность: {emp_position or '—'}\n"
+                f"📍 Участок: {emp_area or '—'}\n\n"
+                f"💡 После выполнения работы вы сможете оценить качество обслуживания."
+            )
+        else:
+            notification = (
+                f"✅ Ваша жалоба №{complaint_id} принята. Работник будет направлен для устранения проблемы.\n\n"
+                f"💡 После выполнения работы вы сможете оценить качество обслуживания."
+            )
+        
+        await callback.bot.send_message(user_id, notification, parse_mode="HTML")
     except Exception as e:
         logger.warning("Could not notify user %s: %s", user_id, e)
 
