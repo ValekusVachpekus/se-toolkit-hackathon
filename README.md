@@ -2,7 +2,7 @@
 
 Система приёма жалоб от жителей на проблемы в ЖКХ.
 
-## 🎯 Возможности
+## Функциолнал
 
 ### Telegram Bot
 - **Пользователи** - подают жалобы (ФИО, адрес, суть проблемы, фото/видео)
@@ -40,7 +40,7 @@
 - **Deploy**: Docker Compose
 - **Notifications**: aiohttp (Telegram Bot API)
 
-## 📁 Структура проекта
+## Структура проекта
 
 ```
 Toolkit-tg-bot/
@@ -91,7 +91,7 @@ Toolkit-tg-bot/
 └── .env.example
 ```
 
-## 🗃 База данных
+## База данных
 
 SQLite с таблицами:
 - `complaints` — жалобы (id, user_id, fio, address, description, media, status, rating, review, rejection_reason...)
@@ -100,7 +100,7 @@ SQLite с таблицами:
 - `complaint_messages` — ID сообщений для инвалидации кнопок
 - `verification_codes` — коды для связи аккаунта с веб-панелью
 
-## 🚀 Быстрый старт
+## Запуск
 
 ### 1. Настроить переменные окружения
 ```bash
@@ -128,20 +128,20 @@ DB_PATH=data/complaints.db        # Путь к базе данных
 docker compose up -d --build
 ```
 
-**Готово!**
+**Использование**
 - Telegram бот: напишите `/start`
 - Веб-панель админа: http://localhost:8000 (пароль из `ADMIN_PASSWORD`)
 - Веб-панель работника: http://localhost:8000 (код из `/link_account` в боте)
 - Веб-панель пользователя: http://localhost:8000 (код из `/link_account` в боте)
 
-**Важно:** Жалобы, поданные через веб-панель, автоматически отправляются работникам в Telegram с кнопками для обработки.
+Жалобы, поданные через веб-панель, автоматически отправляются работникам в Telegram с кнопками для обработки.
 
 ### Остановить
 ```bash
 docker compose down
 ```
 
-## 📱 Команды бота
+## Команды Telegram-бота
 
 ### Для жителей
 | Команда | Описание |
@@ -166,7 +166,7 @@ docker compose down
 | `/complaints` | Активные жалобы |
 | `/blocked` | Заблокированные пользователи |
 
-## 🌐 Веб-панель
+## Веб-панель
 
 ### Вход
 - **Администратор**: пароль из `.env`
@@ -190,7 +190,7 @@ docker compose down
 - **Детали жалобы** (`/user/complaints/{id}`) - полная информация, статус, работник
 - **Оценить работу** (`/user/complaints/{id}/rate`) - оценка 1-5 звёзд + отзыв
 
-## ✅ Реализовано
+## Реализовано
 
 - [x] Telegram бот с FSM
 - [x] Подача жалоб (ФИО, адрес, описание, медиа)
@@ -205,18 +205,18 @@ docker compose down
 - [x] Загрузка медиа в Telegram из веб-панели
 - [x] Инвалидация кнопок после обработки жалобы
 
-## 📝 TODO
+## TODO
 
 - [ ] Экспорт жалоб в CSV/Excel
 - [ ] PostgreSQL для production
 - [ ] Push-уведомления в веб-панели
 - [ ] Публичная форма подачи жалоб
 
-## 📄 Лицензия
+## Лицензия
 
 [GPL v3.0](LICENSE) 
 
-## 👤 Автор
+## Автор
 
  - GitHub: [ValekusVachpekus]([url](https://github.com/ValekusVachpekus))
  - Электронная почта: i.shchetkov@innopolis.university
