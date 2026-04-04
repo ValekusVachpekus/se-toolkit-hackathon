@@ -440,52 +440,8 @@ async def log_complaint_to_group(
 # Account linking via verification code
 # ---------------------------------------------------------------------------
 
-@router.message(Command("link_account"))
-async def cmd_link_account(message: Message) -> None:
-    """Generate verification code for linking account to web panel"""
-    uid = message.from_user.id
-    username = message.from_user.username or "no_username"
-    
-    # Check if already employee
-    async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute(
-            "SELECT user_id FROM employees WHERE user_id=? AND registered=1",
-            (uid,)
-        )
-        emp = await cursor.fetchone()
-        if not emp:
-            await message.answer("❌ Вы не зарегистрированы как работник.")
-            return
-        
-        # Generate 6-digit code
-        import random
-        code = f"{random.randint(100000, 999999)}"
-        
-        # Save to DB with 10-minute expiry
-        from datetime import datetime, timedelta
-        expires = datetime.now() + timedelta(minutes=10)
-        
-        try:
-            await db.execute(
-                "INSERT INTO verification_codes (code, user_id, username, expires_at, role) VALUES (?, ?, ?, ?, ?)",
-                (code, uid, username, expires, "employee")
-            )
-            await db.commit()
-        except Exception:
-            # Code already exists, delete and retry
-            await db.execute("DELETE FROM verification_codes WHERE code=?", (code,))
-            await db.execute(
-                "INSERT INTO verification_codes (code, user_id, username, expires_at, role) VALUES (?, ?, ?, ?, ?)",
-                (code, uid, username, expires, "employee")
-            )
-            await db.commit()
-    
-    logger.info(f"🔗 Код подтверждения {code} сгенерирован для {username} ({uid})")
-    
-    await message.answer(
-        f"🔗 <b>Связь аккаунта с веб-панелью</b>\n\n"
-        f"Ваш код подтверждения: <code>{code}</code>\n\n"
-        f"Перейдите на веб-панель и введите этот код на странице связи аккаунта.\n"
-        f"Код действует 10 минут.",
-        parse_mode="HTML"
-    )
+# @router.message(Command("link_account"))
+# async def cmd_link_account(message: Message) -> None:
+#     """Generate verification code for linking account to web panel"""
+#     # MOVED TO user.py to handle both employees and regular users in one place
+#     pass

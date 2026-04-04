@@ -358,7 +358,7 @@ async def process_review(message: Message, state: FSMContext) -> None:
 
 @router.message(Command("link_account"))
 async def cmd_link_account_user(message: Message) -> None:
-    """Generate verification code for linking user account to web panel"""
+    """Generate verification code for linking account to web panel (for both users and employees)"""
     uid = message.from_user.id
     username = message.from_user.username or "no_username"
     
@@ -366,50 +366,77 @@ async def cmd_link_account_user(message: Message) -> None:
         await message.answer("❌ Вы заблокированы.")
         return
     
-    # Check if this is an employee - they use the employee version
+    # Check if this is an employee
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
-            "SELECT user_id FROM employees WHERE user_id=?",
+            "SELECT user_id, registered FROM employees WHERE user_id=?",
             (uid,)
         )
         emp = await cursor.fetchone()
-        if emp:
-            # Employee - redirect to employee handler
-            await message.answer(
-                "ℹ️ Вы зарегистрированы как работник.\n"
-                "Используйте /link_account в чате работников для получения кода."
-            )
-            return
         
-        # Generate 6-digit code for regular user
+        # Generate 6-digit code
         import random
         code = f"{random.randint(100000, 999999)}"
         
-        # Save to DB with 10-minute expiry, role='user'
+        # Save to DB with 10-minute expiry
         from datetime import datetime, timedelta
         expires = datetime.now() + timedelta(minutes=10)
         
-        try:
-            await db.execute(
-                "INSERT INTO verification_codes (code, user_id, username, expires_at, role) VALUES (?, ?, ?, ?, ?)",
-                (code, uid, username, expires, "user")
+        if emp:
+            # Employee - check if registered
+            if not emp[1]:  # not registered
+                await message.answer("❌ Вы не зарегистрированы как работник.\nИспользуйте /register для регистрации.")
+                return
+            
+            role = "employee"
+            try:
+                await db.execute(
+                    "INSERT INTO verification_codes (code, user_id, username, expires_at, role) VALUES (?, ?, ?, ?, ?)",
+                    (code, uid, username, expires, role)
+                )
+                await db.commit()
+            except Exception:
+                # Code already exists, delete and retry
+                await db.execute("DELETE FROM verification_codes WHERE code=?", (code,))
+                await db.execute(
+                    "INSERT INTO verification_codes (code, user_id, username, expires_at, role) VALUES (?, ?, ?, ?, ?)",
+                    (code, uid, username, expires, role)
+                )
+                await db.commit()
+            
+            logger.info(f"🔗 Код подтверждения {code} сгенерирован для работника {username} ({uid})")
+            
+            await message.answer(
+                f"🔗 <b>Связь аккаунта с веб-панелью</b>\n\n"
+                f"Ваш код подтверждения: <code>{code}</code>\n\n"
+                f"Перейдите на веб-панель и введите этот код для входа как работник.\n"
+                f"Код действует 10 минут.",
+                parse_mode="HTML"
             )
-            await db.commit()
-        except Exception:
-            # Code already exists, delete and retry
-            await db.execute("DELETE FROM verification_codes WHERE code=?", (code,))
-            await db.execute(
-                "INSERT INTO verification_codes (code, user_id, username, expires_at, role) VALUES (?, ?, ?, ?, ?)",
-                (code, uid, username, expires, "user")
+        else:
+            # Regular user
+            role = "user"
+            try:
+                await db.execute(
+                    "INSERT INTO verification_codes (code, user_id, username, expires_at, role) VALUES (?, ?, ?, ?, ?)",
+                    (code, uid, username, expires, role)
+                )
+                await db.commit()
+            except Exception:
+                # Code already exists, delete and retry
+                await db.execute("DELETE FROM verification_codes WHERE code=?", (code,))
+                await db.execute(
+                    "INSERT INTO verification_codes (code, user_id, username, expires_at, role) VALUES (?, ?, ?, ?, ?)",
+                    (code, uid, username, expires, role)
+                )
+                await db.commit()
+            
+            logger.info(f"🔗 Код подтверждения {code} сгенерирован для пользователя {username} ({uid})")
+            
+            await message.answer(
+                f"🔗 <b>Связь аккаунта с веб-панелью</b>\n\n"
+                f"Ваш код подтверждения: <code>{code}</code>\n\n"
+                f"Перейдите на веб-панель и введите этот код для входа как житель.\n"
+                f"Код действует 10 минут.",
+                parse_mode="HTML"
             )
-            await db.commit()
-    
-    logger.info(f"🔗 Код подтверждения {code} сгенерирован для пользователя {username} ({uid})")
-    
-    await message.answer(
-        f"🔗 <b>Связь аккаунта с веб-панелью</b>\n\n"
-        f"Ваш код подтверждения: <code>{code}</code>\n\n"
-        f"Перейдите на веб-панель и введите этот код для входа как житель.\n"
-        f"Код действует 10 минут.",
-        parse_mode="HTML"
-    )
