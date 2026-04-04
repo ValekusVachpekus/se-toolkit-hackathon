@@ -7,13 +7,24 @@
 ### Screenshots
 
 **Веб-панель администратора:**
-![Admin Dashboard](screenshots/admin-dashboard.png)
+<img width="3070" height="1516" alt="изображение" src="https://github.com/user-attachments/assets/89dc83b0-a245-4dc4-ae1c-75a307db782c" />
+<img width="3070" height="1508" alt="изображение" src="https://github.com/user-attachments/assets/f37d3514-9aa9-4cf8-964c-6c0cb81799e4" />
+<img width="3070" height="1514" alt="изображение" src="https://github.com/user-attachments/assets/d10b1942-05de-4a7e-ba05-eb591401b452" />
+<img width="3070" height="1514" alt="изображение" src="https://github.com/user-attachments/assets/b8629919-9604-4cbf-a430-851af02d1dbb" />
+<img width="3070" height="1514" alt="изображение" src="https://github.com/user-attachments/assets/c8ff9244-0523-4686-a008-03e9c4fd9baf" />
+
+**Веб-панель работника:**
+<img width="3070" height="1510" alt="изображение" src="https://github.com/user-attachments/assets/d392ccb1-78c9-455d-a89f-0be2e716c1c9" />
+
 
 **Telegram бот - подача жалобы:**
-![Bot Complaint](screenshots/bot-complaint.png)
+<img width="1258" height="1496" alt="изображение" src="https://github.com/user-attachments/assets/d7cd1358-f7be-4d32-85d9-afcbf3b27ebf" />
+<img width="762" height="342" alt="изображение" src="https://github.com/user-attachments/assets/7ca50cf1-21d8-4369-b213-494ba3355e40" />
+<img width="822" height="560" alt="изображение" src="https://github.com/user-attachments/assets/689190d4-4cca-4592-a173-75d7029569e7" />
+
 
 **Веб-панель пользователя:**
-![User Panel](screenshots/user-panel.png)
+<img width="2116" height="1512" alt="изображение" src="https://github.com/user-attachments/assets/692828b4-a212-4499-b3bd-073babc85ea0" />
 
 ## Функциолнал
 
