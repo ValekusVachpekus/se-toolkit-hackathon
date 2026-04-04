@@ -146,21 +146,35 @@ function toggleForm() {
     const adminForm = document.getElementById('adminForm');
     const employeeForm = document.getElementById('employeeForm');
     const userForm = document.getElementById('userForm');
+    
+    // Clear all inputs when switching
+    document.getElementById('password').value = '';
+    document.getElementById('code').value = '';
+    document.getElementById('user_code').value = '';
 
     if (role === 'admin') {
         adminForm.style.display = 'block';
         employeeForm.style.display = 'none';
         userForm.style.display = 'none';
+        document.getElementById('password').disabled = false;
+        document.getElementById('code').disabled = true;
+        document.getElementById('user_code').disabled = true;
         document.getElementById('password').focus();
     } else if (role === 'employee') {
         adminForm.style.display = 'none';
         employeeForm.style.display = 'block';
         userForm.style.display = 'none';
+        document.getElementById('password').disabled = true;
+        document.getElementById('code').disabled = false;
+        document.getElementById('user_code').disabled = true;
         document.getElementById('code').focus();
     } else {
         adminForm.style.display = 'none';
         employeeForm.style.display = 'none';
         userForm.style.display = 'block';
+        document.getElementById('password').disabled = true;
+        document.getElementById('code').disabled = true;
+        document.getElementById('user_code').disabled = false;
         document.getElementById('user_code').focus();
     }
 }
