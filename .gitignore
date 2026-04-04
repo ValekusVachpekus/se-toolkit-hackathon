@@ -35,3 +35,6 @@ logs/
 
 # Docker
 docker-compose.override.yml
+
+# LICENSE backup
+LICENSE.bak
