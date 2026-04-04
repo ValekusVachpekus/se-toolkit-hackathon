@@ -2,6 +2,19 @@
 
 Система приёма жалоб от жителей на проблемы в ЖКХ.
 
+## Demo
+
+### Screenshots
+
+**Веб-панель администратора:**
+![Admin Dashboard](screenshots/admin-dashboard.png)
+
+**Telegram бот - подача жалобы:**
+![Bot Complaint](screenshots/bot-complaint.png)
+
+**Веб-панель пользователя:**
+![User Panel](screenshots/user-panel.png)
+
 ## Функциолнал
 
 ### Telegram Bot
@@ -102,6 +115,12 @@ SQLite с таблицами:
 
 ## Запуск
 
+### Требования
+
+- **ОС**: Ubuntu 24.04 (или совместимая Linux система)
+- **Docker**: 24.0 или новее
+- **Docker Compose**: v2.0 или новее
+
 ### 1. Настроить переменные окружения
 ```bash
 cp .env.example .env
@@ -139,6 +158,95 @@ docker compose up -d --build
 ### Остановить
 ```bash
 docker compose down
+```
+
+## Deployment
+
+### Развертывание на VM
+
+#### Системные требования
+
+- **ОС**: Ubuntu 24.04 LTS
+- **Установленное ПО**:
+  - Docker Engine 24.0+
+  - Docker Compose v2+
+  - Git
+
+#### Пошаговая инструкция
+
+1. **Установить Docker и Docker Compose** (если не установлены):
+   ```bash
+   # Обновить пакеты
+   sudo apt update
+   
+   # Установить Docker
+   sudo apt install -y docker.io docker-compose-v2
+   
+   # Добавить пользователя в группу docker
+   sudo usermod -aG docker $USER
+   newgrp docker
+   ```
+
+2. **Клонировать репозиторий**:
+   ```bash
+   git clone https://github.com/ValekusVachpekus/se-toolkit-hackathon.git
+   cd se-toolkit-hackathon
+   ```
+
+3. **Настроить переменные окружения**:
+   ```bash
+   cp .env.example .env
+   nano .env  # или используйте любой текстовый редактор
+   ```
+   
+   Обязательно заполните:
+   - `BOT_TOKEN` - токен от @BotFather
+   - `ADMIN_ID` - ваш Telegram ID
+   - `ADMIN_PASSWORD` - пароль для веб-панели
+   - `SECRET_KEY` - случайная строка для сессий
+   - `LOG_CHAT_ID` - (опционально) ID группы для архива
+
+4. **Создать необходимые директории**:
+   ```bash
+   mkdir -p data logs
+   chmod 777 data logs
+   ```
+
+5. **Запустить приложение**:
+   ```bash
+   docker compose up -d --build
+   ```
+
+6. **Проверить статус**:
+   ```bash
+   docker compose ps
+   docker compose logs -f
+   ```
+
+7. **Доступ к приложению**:
+   - Telegram бот: напишите `/start` вашему боту
+   - Веб-панель: `http://<IP_вашего_VM>:8000`
+
+#### Обновление приложения
+
+```bash
+cd se-toolkit-hackathon
+git pull
+docker compose down
+docker compose up -d --build
+```
+
+#### Остановка приложения
+
+```bash
+docker compose down
+```
+
+#### Полная очистка (включая данные)
+
+```bash
+docker compose down -v
+rm -rf data logs
 ```
 
 ## Команды Telegram-бота
@@ -214,7 +322,7 @@ docker compose down
 
 ## Лицензия
 
-[GPL v3.0](LICENSE) 
+[MIT License](LICENSE) 
 
 ## Автор
 
