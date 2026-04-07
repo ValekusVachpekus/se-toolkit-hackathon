@@ -126,6 +126,15 @@ SQLite с таблицами:
 
 ## Запуск
 
+### 1. Ручной запуск (Version 1 - Direct Run)
+1. Установить 3.12: `sudo apt install python3.12`
+2. Создать venv: `python3 -m venv venv && source venv/bin/activate`
+3. Установить зависимости: `pip install -r requirements.txt`
+4. Настроить `.env`: `cp .env.example .env`, `nano .env`
+5. Запустить: `python -m bot.main` (бот) и `uvicorn web.main:app` (web).
+
+### 2. Docker (Version 2 - Рекомендовано)
+
 ### Требования
 
 - **ОС**: Ubuntu 24.04 (или совместимая Linux система)
