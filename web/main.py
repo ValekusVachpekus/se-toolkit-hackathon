@@ -496,6 +496,7 @@ async def login(request: Request):
         response.set_cookie("auth_token", SECRET_KEY, httponly=True, max_age=86400 * 7)
         response.set_cookie("user_role", "employee", httponly=True, max_age=86400 * 7)
         response.set_cookie("employee_user_id", str(user_id), httponly=True, max_age=86400 * 7)
+        response.set_cookie("employee_username", username or "", httponly=True, max_age=86400 * 7)
         return response
 
     else:  # user
@@ -527,6 +528,7 @@ async def login(request: Request):
         response.set_cookie("auth_token", SECRET_KEY, httponly=True, max_age=86400 * 7)
         response.set_cookie("user_role", "user", httponly=True, max_age=86400 * 7)
         response.set_cookie("user_user_id", str(user_id), httponly=True, max_age=86400 * 7)
+        response.set_cookie("user_username", username or "", httponly=True, max_age=86400 * 7)
         return response
 
 
@@ -1180,7 +1182,7 @@ async def submit_complaint(request: Request):
 
     # Save complaint
     db = get_db()
-    username = None  # Will be filled if linked
+    username = request.cookies.get("user_username") or None
     cursor = db.execute(
         """INSERT INTO complaints (user_id, username, fio, address, description, media_file_id, media_type, media_local_path)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
